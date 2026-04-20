@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>派訓名單轉換工具</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #ffffff;
+      --bg2:       #f5f5f4;
+      --bg3:       #eeede9;
+      --border:    rgba(0,0,0,0.10);
+      --border2:   rgba(0,0,0,0.18);
+      --text:      #1a1a18;
+      --text2:     #6b6b67;
+      --text3:     #9b9b97;
+      --blue:      #185FA5;
+      --blue-bg:   #E6F1FB;
+      --green:     #3B6D11;
+      --green-bg:  #EAF3DE;
+      --green-bd:  #C0DD97;
+      --amber:     #BA7517;
+      --red:       #A32D2D;
+      --radius:    10px;
+      --radius-sm: 6px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background: var(--bg3);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    h1 {
+      font-size: 20px; font-weight: 600;
+      margin-bottom: 0.25rem; color: var(--text);
+    }
+    .subtitle { font-size: 13px; color: var(--text2); margin-bottom: 2rem; }
+
+    /* ── 步驟列 ── */
+    .steps { display: flex; align-items: center; margin-bottom: 0.75rem; }
+    .step-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; flex-shrink: 0;
+      border: 1.5px solid var(--border2);
+      background: var(--bg2); color: var(--text2);
+      transition: all 0.2s;
+    }
+    .step-dot.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .step-dot.done   { background: var(--green); color: #fff; border-color: var(--green); }
+    .step-line { flex: 1; height: 1px; background: var(--border); transition: background 0.2s; }
+    .step-line.done { background: var(--green); }
+    .step-labels { display: flex; margin-bottom: 1.5rem; }
+    .step-label { flex: 1; font-size: 11px; color: var(--text3); }
+    .step-label:nth-child(1) { text-align: left; }
+    .step-label:nth-child(2) { text-align: center; }
+    .step-label:nth-child(3) { text-align: center; }
+    .step-label:nth-child(4) { text-align: right; }
+    .step-label.active { color: var(--blue); font-weight: 600; }
+    .step-label.done   { color: var(--green); }
+
+    /* ── 卡片 ── */
+    .panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .panel-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+    .panel-desc  { font-size: 12px; color: var(--text2); margin-bottom: 1rem; line-height: 1.5; }
+
+    /* ── Tags ── */
+    .field-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+    .tag {
+      font-size: 11px; padding: 3px 9px;
+      border-radius: 99px;
+      background: var(--bg2); color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .tag.required { background: var(--blue-bg); color: var(--blue); border-color: rgba(24,95,165,0.2); }
+
+    /* ── 狀態列 ── */
+    .data-status {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); margin-bottom: 0.75rem; font-size: 13px;
+      background: var(--bg2);
+    }
+    .data-status.loaded { background: var(--green-bg); border-color: var(--green-bd); }
+    .ds-icon { font-size: 16px; flex-shrink: 0; }
+    .ds-text { flex: 1; color: var(--text); line-height: 1.4; }
+    .ds-text small { display: block; font-size: 11px; color: var(--text2); margin-top: 1px; }
+    .ds-count { font-size: 12px; font-weight: 600; color: var(--green); flex-shrink: 0; }
+
+    /* ── 上傳區 ── */
+    .upload-zone {
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 1.25rem; text-align: center;
+      cursor: pointer; transition: background 0.15s; position: relative;
+      background: var(--bg);
+    }
+    .upload-zone:hover { background: var(--bg2); }
+    .upload-zone.loaded { border-color: var(--green); background: var(--green-bg); border-style: solid; }
+    .upload-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .uz-icon  { font-size: 22px; margin-bottom: 0.35rem; }
+    .uz-label { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .uz-label span { color: var(--blue); text-decoration: underline; }
+
+    /* ── 多檔清單 ── */
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+    .list-title  { font-size: 12px; font-weight: 600; color: var(--text2); }
+    .count-pill  {
+      font-size: 11px; padding: 2px 9px; border-radius: 99px; font-weight: 600;
+      background: var(--blue-bg); color: var(--blue);
+    }
+    .count-pill.zero { background: var(--bg2); color: var(--text3); }
+
+    .file-list { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 0.75rem; }
+    .fl-empty  { padding: 1.25rem; text-align: center; font-size: 12px; color: var(--text3); }
+    .fl-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-bottom: 1px solid var(--border);
+      font-size: 13px; background: var(--bg); transition: background 0.1s;
+    }
+    .fl-row:last-child { border-bottom: none; }
+    .fl-row:hover { background: var(--bg2); }
+    .fl-icon { font-size: 14px; flex-shrink: 0; }
+    .fl-name { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fl-size { font-size: 11px; color: var(--text3); flex-shrink: 0; min-width: 55px; text-align: right; }
+    .fl-del  {
+      cursor: pointer; font-size: 12px; padding: 3px 7px; border-radius: 4px;
+      border: none; background: none; color: var(--text3); flex-shrink: 0;
+    }
+    .fl-del:hover { color: var(--red); background: #FCEBEB; }
+
+    .add-btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; padding: 9px;
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius-sm);
+      background: none; cursor: pointer;
+      font-size: 13px; color: var(--blue); font-family: inherit;
+      position: relative; transition: background 0.15s;
+    }
+    .add-btn:hover { background: var(--blue-bg); }
+    .add-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+    /* ── Dept 選擇 ── */
+    .dept-row { display: flex; gap: 12px; align-items: center; }
+    .dept-row label { font-size: 13px; color: var(--text2); flex-shrink: 0; }
+    select, input[type=text] {
+      flex: 1; padding: 7px 10px; font-size: 13px;
+      border: 1px solid var(--border2); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--text); font-family: inherit;
+    }
+    select:focus, input[type=text]:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+    /* ── 按鈕 ── */
+    .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
+    .btn {
+      font-size: 13px; font-weight: 600; padding: 8px 18px;
+      border-radius: var(--radius-sm); cursor: pointer;
+      border: 1px solid var(--border2);
+      background: var(--bg); color: var(--text);
+      font-family: inherit; transition: background 0.15s;
+    }
+    .btn:hover:not(:disabled) { background: var(--bg2); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .btn.primary:hover:not(:disabled) { background: #0C447C; }
+
+    /* ── 提示文字 ── */
+    .hint { font-size: 11px; color: var(--text3); margin-top: 0.6rem; line-height: 1.6; }
+    .hint b { color: var(--text2); font-weight: 600; }
+
+    /* ── Log ── */
+    .log {
+      background: #1e1e1e; border-radius: var(--radius-sm);
+      padding: 12px 14px; font-size: 12px;
+      font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+      color: #ccc; max-height: 180px; overflow-y: auto; line-height: 1.9;
+    }
+    .log .ok   { color: #7ec870; }
+    .log .err  { color: #f08080; }
+    .log .info { color: #79b8ff; }
+    .log .warn { color: #e3b341; }
+
+    /* ── 結果統計 ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1rem; }
+    .summary-card { background: var(--bg2); border-radius: var(--radius-sm); padding: 0.85rem 0.5rem; text-align: center; }
+    .summary-num  { font-size: 22px; font-weight: 700; color: var(--text); }
+    .summary-lbl  { font-size: 10px; color: var(--text2); margin-top: 3px; }
+    .summary-card.warn .summary-num { color: var(--amber); }
+
+    .result-block { text-align: center; padding: 0.75rem 0 0.5rem; }
+    .result-icon  { font-size: 36px; margin-bottom: 0.5rem; }
+    .result-msg   { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+    .result-sub   { font-size: 12px; color: var(--text2); }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📋 派訓名單轉換工具</h1>
+  <p class="subtitle">將各單位 A 格式派訓表合併轉換成 Data All 格式，自動剔除重複派訓</p>
+
+  <!-- 步驟列 -->
+  <div class="steps">
+    <div class="step-dot active" id="dot1">1</div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-dot" id="dot2">2</div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-dot" id="dot3">3</div>
+    <div class="step-line" id="line3"></div>
+    <div class="step-dot" id="dot4">4</div>
+  </div>
+  <div class="step-labels">
+    <span class="step-label active" id="lbl1">人事資料</span>
+    <span class="step-label" id="lbl2">課程資訊</span>
+    <span class="step-label" id="lbl3">派訓名單</span>
+    <span class="step-label" id="lbl4">產出</span>
+  </div>
+
+  <!-- ══ Step 1 ══ -->
+  <div id="step1">
+    <div class="panel">
+      <div class="panel-title">人事資料檔案</div>
+      <div class="panel-desc">提供員工基本資料，依工號查詢姓名、部門、Email 等欄位。上傳後會記在瀏覽器，有異動時再重新上傳即可。</div>
+      <div class="field-tags">
+        <span class="tag required">Staff ID（必要）</span>
+        <span class="tag">Name</span><span class="tag">Dept</span>
+        <span class="tag">Sub-team</span><span class="tag">Email</span>
+        <span class="tag">List Order</span><span class="tag">Staff Location</span>
+      </div>
+      <div class="data-status" id="staffStatus">
+        <span class="ds-icon">📋</span>
+        <span class="ds-text">尚未載入人事資料<small>上傳後會記住，下次開啟不需重新上傳</small></span>
+      </div>
+      <div class="upload-zone" id="zone1">
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleStaff(this)">
+        <div class="uz-icon">⬆️</div>
+        <div class="uz-label" id="zone1label">點擊或拖曳上傳人事資料<br><span>支援 .xlsx / .xls / .csv</span></div>
+      </div>
+      <p class="hint">選填。若未上傳，Name、Email 等欄位以 A 格式檔案內的資料填入。</p>
+    </div>
+    <div class="panel">
+      <div class="panel-title">預設 Dept 代號</div>
+      <div class="dept-row" style="margin-top:0.25rem">
+        <label>Dept：</label>
+        <select id="deptSelect">
+          <option value="SMC">SMC</option><option value="CNBG">CNBG</option>
+          <option value="CMBG">CMBG</option><option value="MMBG">MMBG</option>
+          <option value="PCBG">PCBG</option><option value="SIBG">SIBG</option>
+          <option value="CTC">CTC</option><option value="RDC">RDC</option>
+          <option value="other">其他（自行輸入）</option>
+        </select>
+        <input type="text" id="deptCustom" placeholder="輸入 Dept 代號" style="display:none;max-width:150px;">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="goStep(2)">下一步 →</button>
+    </div>
+  </div>
+
+  <!-- ══ Step 2 ══ -->
+  <div id="step2" class="hidden">
+    <div class="panel">
+      <div class="panel-title">課程資訊檔案</div>
+      <div class="panel-desc">提供課程詳細資料，依課程代號（Course）對應帶入。E/Classroom 與 AM/PM 會自動推算，不需手動填寫。</div>
+      <div class="field-tags">
+        <span class="tag required">Course（必要）</span>
+        <span class="tag">Course Name</span><span class="tag">Lecturer</span>
+        <span class="tag">Course Duration</span><span class="tag">Course Time</span>
+        <span class="tag">Course Date</span>
+      </div>
+      <div class="data-status" id="courseStatus">
+        <span class="ds-icon">📚</span>
+        <span class="ds-text">尚未載入課程資訊<small>上傳後會記住，有更新時再重新上傳</small></span>
+      </div>
+      <div class="upload-zone" id="zone2">
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleCourse(this)">
+        <div class="uz-icon">⬆️</div>
+        <div class="uz-label">點擊或拖曳上傳課程資訊<br><span>支援 .xlsx / .xls / .csv</span></div>
+      </div>
+      <p class="hint">選填。Course Time 格式範例：<b>13:30~15:00</b>（實體課）或 <b>N/A</b>（線上課）。</p>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="goStep(1)">← 上一步</button>
+      <button class="btn primary" onclick="goStep(3)">下一步 →</button>
+    </div>
+  </div>
+
+  <!-- ══ Step 3 ══ -->
+  <div id="step3" class="hidden">
+    <div class="panel">
+      <div class="panel-title">派訓名單檔案（A 格式）</div>
+      <div class="panel-desc">每列一位員工，每欄一門課程，儲存格為梯次代號（如 R9851）。可分批加入不同單位的檔案，重複派訓自動剔除。</div>
+      <div class="field-tags">
+        <span class="tag required">工號</span>
+        <span class="tag">姓名</span><span class="tag">廠區</span>
+        <span class="tag">課程欄位（A03、C12…）</span>
+      </div>
+
+      <div class="list-header">
+        <span class="list-title">已加入的檔案</span>
+        <span class="count-pill zero" id="fileCount">0 個</span>
+      </div>
+      <div class="file-list" id="fileList">
+        <div class="fl-empty">尚未加入任何檔案</div>
+      </div>
+      <button class="add-btn">
+        <input type="file" accept=".xlsx,.xls" multiple onchange="addTrainingFiles(this)">
+        <span style="font-size:17px;font-weight:700;line-height:1">+</span>
+        <span>新增派訓名單（可一次選多個）</span>
+      </button>
+      <p class="hint">
+        <b>✦ 同一（課程 + 工號）只保留一筆</b>，不同單位重複派訓的人員會自動剔除。<br>
+        ✦ 可多次點擊「新增」分批加入不同單位的檔案。
+      </p>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="goStep(2)">← 上一步</button>
+      <button class="btn primary" onclick="startConvert()">開始轉換 ▶</button>
+    </div>
+  </div>
+
+  <!-- ══ Step 4 ══ -->
+  <div id="step4" class="hidden">
+    <div class="panel">
+      <div class="log" id="logArea"></div>
+    </div>
+    <div class="panel" id="resultPanel" style="display:none">
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="result-block">
+        <div class="result-icon">✅</div>
+        <div class="result-msg" id="resultMsg"></div>
+        <div class="result-sub">重複派訓已自動剔除</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="goStep(3)">← 返回修改</button>
+        <button class="btn primary" id="btnDownload">⬇ 下載 Excel</button>
+      </div>
+    </div>
+    <div class="panel" id="errPanel" style="display:none">
+      <div class="result-block">
+        <div class="result-icon">⚠️</div>
+        <div class="result-msg" id="errMsg" style="color:#A32D2D;font-size:13px"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="goStep(3)">← 返回修改</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STAFF_KEY  = 'trainingTool_v1_staffMap';
+const COURSE_KEY = 'trainingTool_v1_courseMap';
+
+let staffMap  = {};
+let courseMap = {};
+let trainingFiles = [];
+let nextFileId = 1;
+let outputBlob = null;
+
+// ── 啟動：從 localStorage 還原 ──
+window.addEventListener('DOMContentLoaded', () => {
+  try {
+    const s = localStorage.getItem(STAFF_KEY);
+    if (s) { const d=JSON.parse(s); staffMap=d.data||{}; updateStaffStatus(d.count,d.filename,d.date); }
+  } catch(e) {}
+  try {
+    const c = localStorage.getItem(COURSE_KEY);
+    if (c) { const d=JSON.parse(c); courseMap=d.data||{}; updateCourseStatus(d.count,d.filename,d.date); }
+  } catch(e) {}
+});
+
+// ── Dept ──
+document.getElementById('deptSelect').addEventListener('change', function() {
+  document.getElementById('deptCustom').style.display = this.value==='other' ? '' : 'none';
+});
+function getDept() {
+  const s = document.getElementById('deptSelect');
+  return s.value==='other' ? (document.getElementById('deptCustom').value.trim()||'SMC') : s.value;
+}
+
+// ── XLSX helper ──
+function readWB(file) {
+  return new Promise((res,rej) => {
+    const r = new FileReader();
+    r.onload = e => { try { res(XLSX.read(e.target.result,{type:'array',cellDates:true})); } catch(err){rej(err);} };
+    r.onerror = rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+function nk(k) { return String(k).trim().toLowerCase().replace(/[\s\-\/]/g,''); }
+function fk(row,...cands) {
+  const keys=Object.keys(row);
+  for(const c of cands){ const cn=nk(c); const f=keys.find(k=>nk(k)===cn); if(f!==undefined) return f; }
+  return null;
+}
+function calcEClass(t) { return (!t||String(t).trim()===''||String(t).toUpperCase()==='N/A') ? 'E' : 'Classroom'; }
+function calcAmPm(t)   { const s=String(t||''); if(/13|14/.test(s)) return 'PM'; if(/09|10/.test(s)) return 'AM'; return ''; }
+
+// ── Step 1：人事資料 ──
+async function handleStaff(input) {
+  const file = input.files[0]; if(!file) return;
+  try {
+    const wb = await readWB(file);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null,raw:false});
+    staffMap = {};
+    for(const row of rows) {
+      const idKey=fk(row,'Staff ID','StaffID','工號','employee_id','empid');
+      if(!idKey) continue;
+      const id=String(row[idKey]||'').trim(); if(!id) continue;
+      staffMap[id]={
+        name:      String(row[fk(row,'Name','姓名')]||'').trim(),
+        dept:      String(row[fk(row,'Dept','dept','部門')]||'').trim(),
+        subteam:   String(row[fk(row,'Sub-team','Subteam','sub_team','小組','team')]||'').trim(),
+        email:     String(row[fk(row,'Email','email','信箱','mail','E-mail')]||'').trim(),
+        listOrder: String(row[fk(row,'List Order','ListOrder','order')]||'').trim(),
+        location:  String(row[fk(row,'Staff Location','Location','廠區','location')]||'').trim(),
+      };
+    }
+    const count=Object.keys(staffMap).length;
+    const date=new Date().toLocaleDateString('zh-TW');
+    localStorage.setItem(STAFF_KEY, JSON.stringify({data:staffMap,count,filename:file.name,date}));
+    updateStaffStatus(count, file.name, date);
+    document.getElementById('zone1').classList.add('loaded');
+    document.getElementById('zone1label').innerHTML='✅ 人事資料已更新<br><span>點擊可重新上傳</span>';
+    input.value='';
+  } catch(e) { alert('讀取失敗：'+e.message); }
+}
+function updateStaffStatus(count,filename,date) {
+  const box=document.getElementById('staffStatus');
+  if(!count) return;
+  box.className='data-status loaded';
+  box.innerHTML=`<span class="ds-icon">✅</span><span class="ds-text">${filename}<small>已載入 ${count} 筆人員資料・${date}</small></span><span class="ds-count">${count} 人</span>`;
+}
+
+// ── Step 2：課程資訊 ──
+async function handleCourse(input) {
+  const file = input.files[0]; if(!file) return;
+  try {
+    const wb = await readWB(file);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null,raw:false});
+    courseMap = {};
+    for(const row of rows) {
+      const cKey=fk(row,'Course','course','課程代號','課程'); if(!cKey) continue;
+      const code=String(row[cKey]||'').trim(); if(!code) continue;
+      const ct=String(row[fk(row,'Course Time','Time','時間','coursetime')]||'').trim();
+      courseMap[code]={
+        courseName: String(row[fk(row,'Course Name','CourseName','課程名稱')]||'').trim(),
+        lecturer:   String(row[fk(row,'Lecturer','講師')]||'').trim(),
+        duration:   String(row[fk(row,'Course Duration','Duration','時數')]||'').trim(),
+        courseTime: ct,
+        eClass:     calcEClass(ct),
+        ampm:       calcAmPm(ct),
+        courseDate: String(row[fk(row,'Course Date','CourseDate','日期')]||'').trim(),
+      };
+    }
+    const count=Object.keys(courseMap).length;
+    const date=new Date().toLocaleDateString('zh-TW');
+    localStorage.setItem(COURSE_KEY, JSON.stringify({data:courseMap,count,filename:file.name,date}));
+    updateCourseStatus(count,file.name,date);
+    document.getElementById('zone2').classList.add('loaded');
+    input.value='';
+  } catch(e) { alert('讀取失敗：'+e.message); }
+}
+function updateCourseStatus(count,filename,date) {
+  const box=document.getElementById('courseStatus');
+  if(!count) return;
+  box.className='data-status loaded';
+  box.innerHTML=`<span class="ds-icon">✅</span><span class="ds-text">${filename}<small>已載入 ${count} 門課程・${date}</small></span><span class="ds-count">${count} 門</span>`;
+}
+
+// ── Step 3：多檔清單 ──
+function addTrainingFiles(input) {
+  Array.from(input.files).forEach(f=>trainingFiles.push({id:nextFileId++,file:f,name:f.name,size:f.size}));
+  input.value=''; renderFileList();
+}
+function removeFile(id) { trainingFiles=trainingFiles.filter(f=>f.id!==id); renderFileList(); }
+function renderFileList() {
+  const list=document.getElementById('fileList'), n=trainingFiles.length;
+  const pill=document.getElementById('fileCount');
+  pill.textContent=`${n} 個`; pill.className='count-pill'+(n===0?' zero':'');
+  list.innerHTML = n===0
+    ? '<div class="fl-empty">尚未加入任何檔案</div>'
+    : trainingFiles.map(f=>`<div class="fl-row">
+        <span class="fl-icon">📊</span>
+        <span class="fl-name" title="${f.name}">${f.name}</span>
+        <span class="fl-size">${(f.size/1024).toFixed(1)} KB</span>
+        <button class="fl-del" onclick="removeFile(${f.id})">✕</button>
+      </div>`).join('');
+}
+
+// ── 步驟切換 ──
+function goStep(n) {
+  [1,2,3,4].forEach(i=>{
+    document.getElementById(`step${i}`).classList.toggle('hidden',i!==n);
+    const dot=document.getElementById(`dot${i}`), lbl=document.getElementById(`lbl${i}`);
+    if(i<n)       { dot.className='step-dot done';   lbl.className='step-label done'; }
+    else if(i===n){ dot.className='step-dot active'; lbl.className='step-label active'; }
+    else          { dot.className='step-dot';        lbl.className='step-label'; }
+    if(i<4) document.getElementById(`line${i}`).className='step-line'+(i<n?' done':'');
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Log ──
+function log(msg,cls='') {
+  const el=document.getElementById('logArea');
+  el.innerHTML+=`<div class="${cls}">${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+
+// ── 主轉換 ──
+async function startConvert() {
+  if(trainingFiles.length===0){ alert('請先加入至少一個派訓名單檔案'); return; }
+  goStep(4);
+  document.getElementById('logArea').innerHTML='';
+  document.getElementById('resultPanel').style.display='none';
+  document.getElementById('errPanel').style.display='none';
+
+  try {
+    const dept=getDept();
+    const sc=Object.keys(staffMap).length, cc=Object.keys(courseMap).length;
+    log(`▶ 開始轉換　預設 Dept = ${dept}`,'info');
+    log(`  人事資料：${sc>0?sc+' 筆':'未載入'}　課程資訊：${cc>0?cc+' 門':'未載入'}`);
+
+    log(`📊 解析派訓名單（共 ${trainingFiles.length} 個檔案）...`,'info');
+    const seen=new Set(), allRec=[];
+    let dupCount=0; const courseSet=new Set();
+
+    for(const tf of trainingFiles) {
+      const wb=await readWB(tf.file);
+      log(`  ▸ ${tf.name}`);
+
+      for(const sheetName of wb.SheetNames) {
+        const raw=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:null,raw:false});
+        if(raw.length<2) continue;
+
+        let hIdx=-1;
+        for(let i=0;i<Math.min(5,raw.length);i++){
+          if((raw[i]||[]).map(c=>String(c||'')).join('|').match(/工號|Staff ID/)){hIdx=i;break;}
+        }
+        if(hIdx<0) continue;
+
+        const header=(raw[hIdx]||[]).map(c=>String(c||'').trim());
+        const iId   =header.findIndex(h=>h==='工號'||h==='Staff ID');
+        const iName =header.findIndex(h=>h==='姓名'||h==='Name');
+        const iLoc  =header.findIndex(h=>['廠區','廠別','Staff Location','Location'].includes(h));
+        if(iId<0) continue;
+
+        const cols=[];
+        for(let c=iId+1;c<header.length;c++){
+          const h=header[c]; if(h&&h!=='nan'&&h!=='NaN') cols.push({idx:c,code:h});
+        }
+
+        let cnt=0, dup=0;
+        for(let r=hIdx+1;r<raw.length;r++){
+          const row=raw[r]; if(!row||!row.length) continue;
+          const empId=String(row[iId]||'').trim();
+          if(!empId||empId==='null'||empId==='NaN') continue;
+          const nameA=iName>=0?String(row[iName]||'').trim():'';
+          const locA =iLoc >=0?String(row[iLoc] ||'').trim():'';
+          const s=staffMap[empId]||{};
+
+          for(const cc of cols){
+            const cv=cc.idx<row.length?row[cc.idx]:null; if(!cv) continue;
+            const rCode=String(cv).replace(/\t/g,'').trim();
+            if(!rCode||rCode==='null'||rCode==='NaN') continue;
+            const key=`${cc.code}|${empId}`;
+            if(seen.has(key)){dupCount++;dup++;continue;}
+            seen.add(key);
+            const ci=courseMap[cc.code]||{};
+            courseSet.add(cc.code); cnt++;
+            const ct=ci.courseTime||'';
+            allRec.push({
+              'Course':          cc.code,
+              'Course Name':     ci.courseName||'',
+              'Lecturer':        ci.lecturer||'',
+              'Course Duration': ci.duration||'',
+              'Course Time':     ct,
+              'E/Classroom':     calcEClass(ct),
+              'AM/PM':           calcAmPm(ct),
+              'Staff ID':        empId,
+              'Staff Location':  s.location||locA||'',
+              'Name':            s.name||nameA||'',
+              'Dept':            s.dept||dept,
+              'Sub-team':        s.subteam||'',
+              'List Order':      s.listOrder||'',
+              'Email':           s.email||'',
+              'Updated Date':    '',
+              'Updated by':      '',
+              'Retired?':        '',
+              'Retired Date':    '',
+              'Course Date':     ci.courseDate||'',
+              'Attendance':      '',
+              'R_Code（A檔梯次）':  rCode,
+            });
+          }
+        }
+        const dupNote=dup>0?`　<span style="color:#e3b341">剔除重複 ${dup} 筆</span>`:'';
+        log(`    　「${sheetName}」：保留 ${cnt} 筆${dupNote}`,'ok');
+      }
+    }
+
+    if(allRec.length===0) throw new Error('沒有解析到任何資料，請確認派訓名單格式是否正確');
+    if(dupCount>0) log(`🔁 共剔除重複派訓 ${dupCount} 筆（同一課程＋工號只保留一筆）`,'warn');
+    const staffSet=new Set(allRec.map(r=>r['Staff ID']));
+    log(`✅ 最終輸出 ${allRec.length} 筆　${staffSet.size} 位員工　${courseSet.size} 門課程`,'ok');
+
+    log('💾 產出 Excel...','info');
+    const wb_out=XLSX.utils.book_new();
+    const ws_out=XLSX.utils.json_to_sheet(allRec);
+    ws_out['!cols']=[
+      {wch:10},{wch:35},{wch:18},{wch:8},{wch:14},{wch:12},{wch:7},
+      {wch:12},{wch:10},{wch:10},{wch:8},{wch:38},{wch:8},{wch:28},
+      {wch:12},{wch:12},{wch:8},{wch:12},{wch:14},{wch:12},{wch:14}
+    ];
+    XLSX.utils.book_append_sheet(wb_out,ws_out,'Data All');
+    outputBlob=new Blob([XLSX.write(wb_out,{bookType:'xlsx',type:'array'})],{type:'application/octet-stream'});
+
+    document.getElementById('summaryGrid').innerHTML=`
+      <div class="summary-card"><div class="summary-num">${allRec.length}</div><div class="summary-lbl">輸出筆數</div></div>
+      <div class="summary-card"><div class="summary-num">${staffSet.size}</div><div class="summary-lbl">員工人數</div></div>
+      <div class="summary-card"><div class="summary-num">${courseSet.size}</div><div class="summary-lbl">課程數</div></div>
+      <div class="summary-card${dupCount>0?' warn':''}"><div class="summary-num">${dupCount}</div><div class="summary-lbl">剔除重複</div></div>`;
+    document.getElementById('resultMsg').textContent=`轉換完成！共 ${allRec.length} 筆記錄`;
+    document.getElementById('btnDownload').onclick=()=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(outputBlob);
+      a.download=`Data_All_${new Date().toISOString().slice(0,10)}.xlsx`;
+      a.click();
+    };
+    document.getElementById('resultPanel').style.display='';
+  } catch(e) {
+    log(`❌ ${e.message}`,'err');
+    document.getElementById('errMsg').textContent=e.message;
+    document.getElementById('errPanel').style.display='';
+  }
+}
+</script>
+</body>
+</html>
