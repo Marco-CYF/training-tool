@@ -108,16 +108,18 @@
       border-radius: var(--radius-sm);
       padding: 1.25rem; text-align: center;
       cursor: pointer; transition: background 0.15s; position: relative;
-      background: var(--bg);
+      background: var(--bg); overflow: hidden;
     }
     .upload-zone:hover { background: var(--bg2); }
     .upload-zone.loaded { border-color: var(--green); background: var(--green-bg); border-style: solid; }
     .upload-zone input[type=file] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+      width: 100%; height: 100%; z-index: 10;
     }
-    .uz-icon  { font-size: 22px; margin-bottom: 0.35rem; }
-    .uz-label { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .uz-icon  { font-size: 22px; margin-bottom: 0.35rem; position: relative; z-index: 1; pointer-events: none; }
+    .uz-label { font-size: 13px; color: var(--text2); line-height: 1.5; position: relative; z-index: 1; pointer-events: none; }
     .uz-label span { color: var(--blue); text-decoration: underline; }
+    .data-status { pointer-events: none; }
 
     /* ── 多檔清單 ── */
     .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -153,10 +155,11 @@
       border-radius: var(--radius-sm);
       background: none; cursor: pointer;
       font-size: 13px; color: var(--blue); font-family: inherit;
-      position: relative; transition: background 0.15s;
+      position: relative; transition: background 0.15s; overflow: hidden;
     }
     .add-btn:hover { background: var(--blue-bg); }
-    .add-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .add-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; z-index: 10; }
+    .add-btn span { position: relative; z-index: 1; pointer-events: none; }
 
     /* ── Dept 選擇 ── */
     .dept-row { display: flex; gap: 12px; align-items: center; }
