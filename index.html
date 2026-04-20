@@ -102,24 +102,21 @@
     .ds-text small { display: block; font-size: 11px; color: var(--text2); margin-top: 1px; }
     .ds-count { font-size: 12px; font-weight: 600; color: var(--green); flex-shrink: 0; }
 
-    /* ── 上傳區 ── */
-    .upload-zone {
+    /* ── 上傳按鈕 ── */
+    .upload-btn {
+      display: block; width: 100%;
       border: 1.5px dashed var(--border2);
       border-radius: var(--radius-sm);
       padding: 1.25rem; text-align: center;
-      cursor: pointer; transition: background 0.15s; position: relative;
-      background: var(--bg); overflow: hidden;
+      cursor: pointer; transition: background 0.15s;
+      background: var(--bg); font-family: inherit;
+      color: inherit;
     }
-    .upload-zone:hover { background: var(--bg2); }
-    .upload-zone.loaded { border-color: var(--green); background: var(--green-bg); border-style: solid; }
-    .upload-zone input[type=file] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer;
-      width: 100%; height: 100%; z-index: 10;
-    }
-    .uz-icon  { font-size: 22px; margin-bottom: 0.35rem; position: relative; z-index: 1; pointer-events: none; }
-    .uz-label { font-size: 13px; color: var(--text2); line-height: 1.5; position: relative; z-index: 1; pointer-events: none; }
-    .uz-label span { color: var(--blue); text-decoration: underline; }
-    .data-status { pointer-events: none; }
+    .upload-btn:hover { background: var(--bg2); border-color: var(--blue); }
+    .upload-btn.loaded { border-color: var(--green); background: var(--green-bg); border-style: solid; }
+    .uz-icon  { display: block; font-size: 22px; margin-bottom: 0.35rem; }
+    .uz-label { display: block; font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .uz-label small { color: var(--blue); font-size: 12px; }
 
     /* ── 多檔清單 ── */
     .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
@@ -155,11 +152,9 @@
       border-radius: var(--radius-sm);
       background: none; cursor: pointer;
       font-size: 13px; color: var(--blue); font-family: inherit;
-      position: relative; transition: background 0.15s; overflow: hidden;
+      transition: background 0.15s;
     }
     .add-btn:hover { background: var(--blue-bg); }
-    .add-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; z-index: 10; }
-    .add-btn span { position: relative; z-index: 1; pointer-events: none; }
 
     /* ── Dept 選擇 ── */
     .dept-row { display: flex; gap: 12px; align-items: center; }
@@ -253,11 +248,11 @@
         <span class="ds-icon">📋</span>
         <span class="ds-text">尚未載入人事資料<small>上傳後會記住，下次開啟不需重新上傳</small></span>
       </div>
-      <div class="upload-zone" id="zone1">
-        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleStaff(this)">
-        <div class="uz-icon">⬆️</div>
-        <div class="uz-label" id="zone1label">點擊或拖曳上傳人事資料<br><span>支援 .xlsx / .xls / .csv</span></div>
-      </div>
+      <input type="file" id="inputStaff" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleStaff(this)">
+      <button class="upload-btn" id="zone1" onclick="document.getElementById('inputStaff').click()">
+        <span class="uz-icon">⬆️</span>
+        <span class="uz-label" id="zone1label">點擊上傳人事資料<br><small>支援 .xlsx / .xls / .csv</small></span>
+      </button>
       <p class="hint">選填。若未上傳，Name、Email 等欄位以 A 格式檔案內的資料填入。</p>
     </div>
     <div class="panel">
@@ -294,11 +289,11 @@
         <span class="ds-icon">📚</span>
         <span class="ds-text">尚未載入課程資訊<small>上傳後會記住，有更新時再重新上傳</small></span>
       </div>
-      <div class="upload-zone" id="zone2">
-        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleCourse(this)">
-        <div class="uz-icon">⬆️</div>
-        <div class="uz-label">點擊或拖曳上傳課程資訊<br><span>支援 .xlsx / .xls / .csv</span></div>
-      </div>
+      <input type="file" id="inputCourse" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleCourse(this)">
+      <button class="upload-btn" id="zone2" onclick="document.getElementById('inputCourse').click()">
+        <span class="uz-icon">⬆️</span>
+        <span class="uz-label">點擊上傳課程資訊<br><small>支援 .xlsx / .xls / .csv</small></span>
+      </button>
       <p class="hint">選填。Course Time 格式範例：<b>13:30~15:00</b>（實體課）或 <b>N/A</b>（線上課）。</p>
     </div>
     <div class="btn-row">
@@ -325,8 +320,8 @@
       <div class="file-list" id="fileList">
         <div class="fl-empty">尚未加入任何檔案</div>
       </div>
-      <button class="add-btn">
-        <input type="file" accept=".xlsx,.xls" multiple onchange="addTrainingFiles(this)">
+      <input type="file" id="inputTraining" accept=".xlsx,.xls" multiple style="display:none" onchange="addTrainingFiles(this)">
+      <button class="add-btn" onclick="document.getElementById('inputTraining').click()">
         <span style="font-size:17px;font-weight:700;line-height:1">+</span>
         <span>新增派訓名單（可一次選多個）</span>
       </button>
@@ -443,8 +438,8 @@ async function handleStaff(input) {
     const date=new Date().toLocaleDateString('zh-TW');
     localStorage.setItem(STAFF_KEY, JSON.stringify({data:staffMap,count,filename:file.name,date}));
     updateStaffStatus(count, file.name, date);
-    document.getElementById('zone1').classList.add('loaded');
-    document.getElementById('zone1label').innerHTML='✅ 人事資料已更新<br><span>點擊可重新上傳</span>';
+    document.getElementById('zone1').className='upload-btn loaded';
+    document.getElementById('zone1label').innerHTML='✅ 人事資料已更新<br><small>點擊可重新上傳</small>';
     input.value='';
   } catch(e) { alert('讀取失敗：'+e.message); }
 }
@@ -480,7 +475,7 @@ async function handleCourse(input) {
     const date=new Date().toLocaleDateString('zh-TW');
     localStorage.setItem(COURSE_KEY, JSON.stringify({data:courseMap,count,filename:file.name,date}));
     updateCourseStatus(count,file.name,date);
-    document.getElementById('zone2').classList.add('loaded');
+    document.getElementById('zone2').className='upload-btn loaded';
     input.value='';
   } catch(e) { alert('讀取失敗：'+e.message); }
 }
